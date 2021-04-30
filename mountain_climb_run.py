@@ -16,7 +16,7 @@ neat = pop.Population(c.MountainClimbConfig)
 solution, generation = neat.run()
 
 if solution is not None:
-    logger.info('Found a Solution')
+    logger.info(f'Found a Solution at generation {generation} with fitness {solution.fitness}')
     draw_net(solution, view=True, filename='./images/mountain-climb-solution', show_disabled=True)
 
     # OpenAI Gym

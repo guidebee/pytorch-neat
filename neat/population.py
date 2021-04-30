@@ -1,6 +1,7 @@
 import logging
 import random
-
+from collections import deque
+from statistics import mean, stdev
 import numpy as np
 
 import neat.utils as utils
@@ -8,7 +9,6 @@ from neat.genotype.genome import Genome
 from neat.species import Species
 from neat.crossover import crossover
 from neat.mutation import mutate
-
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ class Population:
         self.Config = config()
         self.population = self.set_initial_population()
         self.species = []
+        self.last10_best_fitnesses = deque(maxlen=10)
 
         for genome in self.population:
             self.speciate(genome, 0)
@@ -32,7 +33,7 @@ class Population:
                 genome.fitness = max(0, self.Config.fitness_fn(genome))
 
             best_genome = utils.get_best_genome(self.population)
-
+            self.last10_best_fitnesses.append(best_genome)
             # Reproduce
             all_fitnesses = []
             remaining_species = []
@@ -47,7 +48,7 @@ class Population:
             min_fitness = min(all_fitnesses)
             max_fitness = max(all_fitnesses)
 
-            fit_range = max(1.0, (max_fitness-min_fitness))
+            fit_range = max(1.0, (max_fitness - min_fitness))
             for species in remaining_species:
                 # Set adjusted fitness
                 avg_species_fitness = np.mean([g.fitness for g in species.members])
@@ -60,7 +61,7 @@ class Population:
             new_population = []
             for species in remaining_species:
                 if species.adjusted_fitness > 0:
-                    size = max(2, int((species.adjusted_fitness/adj_fitness_sum) * self.Config.POPULATION_SIZE))
+                    size = max(2, int((species.adjusted_fitness / adj_fitness_sum) * self.Config.POPULATION_SIZE))
                 else:
                     size = 2
 
@@ -96,6 +97,20 @@ class Population:
 
             if best_genome.fitness >= self.Config.FITNESS_THRESHOLD:
                 return best_genome, generation
+
+            if len(self.last10_best_fitnesses) == 10:
+                fitnesses = []
+                final_best = self.last10_best_fitnesses[0]
+                for genome in self.last10_best_fitnesses:
+                    fitnesses.append(genome.fitness)
+                    if final_best.fitness < genome.fitness:
+                        final_best = genome
+                mean_fitness = mean(fitnesses)
+
+                if mean_fitness != 0:
+                    variation = abs(mean_fitness - best_genome.fitness) * 100 / mean_fitness
+                    if variation < 2:
+                        return final_best, generation
 
             # Generation Stats
             if self.Config.VERBOSE:
